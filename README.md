@@ -46,3 +46,24 @@ All commands are run from the root of the project, from a terminal:
 ## 👀 Want to learn more?
 
 Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+
+## Deployment to Netlify
+
+This project is configured for easy deployment to Netlify. Follow these steps to deploy:
+
+1. Push your code to a GitHub repository
+2. Log in to Netlify and click "New site from Git"
+3. Select your repository and use the following settings:
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+
+### Environment Variables
+
+Set the following environment variables in your Netlify dashboard (Site settings > Environment variables):
+
+- `PUBLIC_SUPABASE_URL` - Your Supabase project URL
+- `PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+
+### Continuous Deployment
+
+Netlify will automatically rebuild and deploy your site whenever you push changes to your repository.
