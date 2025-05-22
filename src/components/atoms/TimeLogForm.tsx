@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.ts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button.tsx";
+import { toast } from "sonner";
 
 function getNowLocal() {
   // Returns current time in 'YYYY-MM-DDTHH:mm' format for datetime-local input
@@ -15,7 +16,6 @@ export default function TimeLogForm() {
   const [notes, setNotes] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [message, setMessage] = useState('');
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerStart, setTimerStart] = useState<Date | null>(null);
   const [timerElapsed, setTimerElapsed] = useState(0);
@@ -50,25 +50,47 @@ export default function TimeLogForm() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const { error } = await supabase.from('time_logs').insert([
-      {
-        task_name: taskName,
-        start_time: startTime,
-        end_time: endTime,
-        notes: notes,
-      },
-    ]);
-    if (error) {
-      setMessage('Error: ' + error.message);
-    } else {
-      setMessage('Time log saved!');
-      setTaskName('');
-      setNotes('');
-      setStartTime('');
-      setEndTime('');
-      setTimerRunning(false);
-      setTimerStart(null);
-      setTimerElapsed(0);
+    
+    // Create a loading toast that will be updated with success or error
+    const toastId = toast.loading('Saving time log...');
+    
+    try {
+      const { error } = await supabase.from('time_logs').insert([
+        {
+          task_name: taskName,
+          start_time: startTime,
+          end_time: endTime,
+          notes: notes,
+        },
+      ]);
+      
+      if (error) {
+        toast.error('Failed to save time log', {
+          id: toastId,
+          description: error.message,
+          duration: 4000,
+        });
+      } else {
+        toast.success('Time log saved successfully!', {
+          id: toastId, 
+          description: `Task: ${taskName}`,
+          duration: 3000,
+        });
+        
+        // Reset form after successful submission
+        setTaskName('');
+        setNotes('');
+        setStartTime('');
+        setEndTime('');
+        setTimerRunning(false);
+        setTimerStart(null);
+        setTimerElapsed(0);
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred', { 
+        id: toastId,
+        duration: 4000,
+      });
     }
   };
 
@@ -259,27 +281,13 @@ export default function TimeLogForm() {
               className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8, duration: 0.4 }}
+              transition={{ delay: 0.1, duration: 0.2 }}
               whileHover={{ scale: 1.02, backgroundColor: '#7c3aed' }}
               whileTap={{ scale: 0.98 }}
           >
             Save Log
           </motion.button>
         </motion.form>
-
-        <AnimatePresence>
-          {message && (
-              <motion.p
-                  className="mt-4 text-center text-sm text-green-400"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-              >
-                {message}
-              </motion.p>
-          )}
-        </AnimatePresence>
 
         <motion.div 
           className="mt-6 text-center"

@@ -3,6 +3,7 @@ import '../assets/global.css';
 import TimeLogForm from '../components/atoms/TimeLogForm.tsx';
 import Particles from '../components/atoms/Particles.tsx';
 import Layout from "../layouts/Layout.astro";
+import { Toaster } from "../components/ui/sonner";
 ---
 <html>
 <Layout>
@@ -10,5 +11,6 @@ import Layout from "../layouts/Layout.astro";
 <div class="fixed inset-0 flex items-center justify-center z-10">
   <TimeLogForm client:load />
 </div>
+<Toaster client:load />
 </Layout>
 </html>

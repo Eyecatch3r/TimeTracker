@@ -2,6 +2,7 @@
 import '../assets/global.css';
 import Layout from "../layouts/Layout.astro";
 import {DashboardTable} from '../components/atoms/DashboardTable.tsx';
+import { Toaster } from "../components/ui/sonner";
 ---
 <html>
 <Layout>
@@ -10,5 +11,6 @@ import {DashboardTable} from '../components/atoms/DashboardTable.tsx';
       <DashboardTable client:load />
     </div>
   </div>
+  <Toaster client:load />
 </Layout>
 </html> 
