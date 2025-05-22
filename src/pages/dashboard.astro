@@ -1,0 +1,14 @@
+---
+import '../assets/global.css';
+import Layout from "../layouts/Layout.astro";
+import {DashboardTable} from '../components/atoms/DashboardTable.tsx';
+---
+<html>
+<Layout>
+  <div class="fixed inset-0 flex items-center justify-center z-10">
+    <div class="w-full max-w-3xl bg-purple-900 shadow-xl text-white rounded-xl p-8">
+      <DashboardTable client:load />
+    </div>
+  </div>
+</Layout>
+</html> 

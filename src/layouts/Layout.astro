@@ -1,3 +1,6 @@
+---
+import Particles from "../components/atoms/Particles";
+---
 <!doctype html>
 <html lang="en">
 	<head>
@@ -7,7 +10,20 @@
 		<meta name="generator" content={Astro.generator} />
 		<title>Astro Basics</title>
 	</head>
-	<body>
+	<body class="bg-gradient-to-br from-black to-purple-400 min-h-screen">
+	<!-- Particles cover the entire viewport -->
+	<Particles
+		client:load
+		class="fixed top-0 left-0 w-screen h-screen z-[-1] pointer-events-none"
+		particleColors={['#bd69bd', '#ff00ff', '#a607d1']}
+		particleCount={400}
+		particleSpread={10}
+		speed={0.1}
+		particleBaseSize={100}
+		moveParticlesOnHover={false}
+		alphaParticles={false}
+		disableRotation={false}
+	/>
 		<slot />
 	</body>
 </html>
