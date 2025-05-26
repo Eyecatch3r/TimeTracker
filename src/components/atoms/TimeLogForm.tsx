@@ -1,13 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient.ts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button.tsx";
 import { toast } from "sonner";
 
+// Define your predefined task names
+const PREDEFINED_TASKS = [
+  "Reading Papers/Theory",
+  "Project Report Writing",
+  "Presentation Preparation",
+  "Prototype Programming",
+  "Meeting/Discussion",
+  "General Admin/Planning",
+  "Bug Fixing",
+  // Add more common tasks here
+];
+
 function getNowLocal() {
-  // Returns current time in 'YYYY-MM-DDTHH:mm' format for datetime-local input
   const now = new Date();
-  now.setSeconds(0, 0); // Remove seconds and ms for input compatibility
+  now.setSeconds(0, 0);
   return now.toISOString().slice(0, 16);
 }
 
@@ -20,7 +31,7 @@ export default function TimeLogForm() {
   const [timerStart, setTimerStart] = useState<Date | null>(null);
   const [timerElapsed, setTimerElapsed] = useState(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
     if (timerRunning && timerStart) {
       interval = setInterval(() => {
@@ -34,14 +45,12 @@ export default function TimeLogForm() {
 
   const handleTimerClick = () => {
     if (!timerRunning) {
-      // Start timer
       const now = new Date();
       setTimerStart(now);
       setStartTime(now.toISOString().slice(0, 16));
       setEndTime('');
       setTimerRunning(true);
     } else {
-      // Stop timer
       const now = new Date();
       setEndTime(now.toISOString().slice(0, 16));
       setTimerRunning(false);
@@ -50,10 +59,9 @@ export default function TimeLogForm() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    // Create a loading toast that will be updated with success or error
+
     const toastId = toast.loading('Saving time log...');
-    
+
     try {
       const { error } = await supabase.from('time_logs').insert([
         {
@@ -63,7 +71,7 @@ export default function TimeLogForm() {
           notes: notes,
         },
       ]);
-      
+
       if (error) {
         toast.error('Failed to save time log', {
           id: toastId,
@@ -72,12 +80,11 @@ export default function TimeLogForm() {
         });
       } else {
         toast.success('Time log saved successfully!', {
-          id: toastId, 
+          id: toastId,
           description: `Task: ${taskName}`,
           duration: 3000,
         });
-        
-        // Reset form after successful submission
+
         setTaskName('');
         setNotes('');
         setStartTime('');
@@ -87,7 +94,7 @@ export default function TimeLogForm() {
         setTimerElapsed(0);
       }
     } catch (error) {
-      toast.error('An unexpected error occurred', { 
+      toast.error('An unexpected error occurred', {
         id: toastId,
         duration: 4000,
       });
@@ -210,19 +217,29 @@ export default function TimeLogForm() {
           <motion.div
               initial={{opacity: 0, x: -20}}
               animate={{opacity: 1, x: 0}}
-              transition={{delay: 0.4, duration: 0.4}}
+              transition={{delay: 0.4, duration: 0.4}} // Example delay
           >
-            <label htmlFor="taskName" className="block text-sm font-medium text-gray-100 mb-1">Task Name</label>
+            <label htmlFor="taskName" className="block text-sm font-medium text-gray-100 mb-1">
+              Task Name
+            </label>
             <motion.input
-                id="taskName"
+                id="taskName" // Make sure this ID matches the label's htmlFor
                 type="text"
-                value={taskName}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskName(e.target.value)}
+                // value={taskName} // From your TimeLogForm state
+                // onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskName(e.target.value)} // From your TimeLogForm state
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 "
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
                 whileFocus={{scale: 1.02}}
                 transition={{duration: 0.2}}
+                list="predefined-tasks-list" // This links the input to the datalist below
+                autoComplete="off" // Good practice when using datalist to avoid browser's own autocomplete conflicting
             />
+            {/* The datalist itself is not visible but provides options to the input */}
+            <datalist id="predefined-tasks-list">
+              {PREDEFINED_TASKS.map((task, index) => (
+                  <option key={index} value={task}/>
+              ))}
+            </datalist>
           </motion.div>
 
           <motion.div
@@ -237,7 +254,7 @@ export default function TimeLogForm() {
                 value={startTime}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartTime(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 "
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" // Added bg-white and text-gray-900
                 whileFocus={{scale: 1.02}}
                 transition={{duration: 0.2}}
             />
@@ -254,7 +271,7 @@ export default function TimeLogForm() {
                 type="datetime-local"
                 value={endTime}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndTime(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 "
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" // Added bg-white and text-gray-900
                 whileFocus={{scale: 1.02}}
                 transition={{duration: 0.2}}
             />
@@ -270,7 +287,7 @@ export default function TimeLogForm() {
                 id="notes"
                 value={notes}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 "
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" // Added bg-white and text-gray-900
                 whileFocus={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
             />
@@ -281,7 +298,7 @@ export default function TimeLogForm() {
               className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.2 }}
+              transition={{ delay: 0.1, duration: 0.1 }} // Reduced delay to match form field reveal
               whileHover={{ scale: 1.02, backgroundColor: '#7c3aed' }}
               whileTap={{ scale: 0.98 }}
           >
@@ -289,13 +306,13 @@ export default function TimeLogForm() {
           </motion.button>
         </motion.form>
 
-        <motion.div 
-          className="mt-6 text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1, duration: 0.5 }}
+        {/* The empty motion.div for potential future content can remain as is */}
+        <motion.div
+            className="mt-6 text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1, duration: 0.5 }}
         >
-
         </motion.div>
       </motion.div>
   );
