@@ -45,11 +45,17 @@ function calculateHoursWorked(startTime: string, endTime: string): number[] {
 
   if (diffMs < 0) return [0,0];
 
-  const minutes = diffMs / 1000 / 60 % 60;
-
+  const minutes = Math.floor((diffMs / 1000 / 60) % 60);
   const hours = Math.floor(diffMs / 1000 / 60 / 60);
 
   return [hours, minutes];
+}
+
+function formatHoursAndMinutes(hours: number, minutes: number): string {
+  if (hours === 0 && minutes === 0) return '0h 0m';
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
 }
 
 function formatHours(hours: number): string {
@@ -81,13 +87,13 @@ export const DashboardTable: React.FC = () => {
         (data || []).forEach(log => {
           let [hours, minutes] = calculateHoursWorked(log.start_time, log.end_time);
           totalHours += hours;
-          if (totalMinutes + minutes >= 60) {
-            totalHours += Math.floor((totalMinutes + minutes) / 60);
-            totalMinutes = (totalMinutes + minutes) % 60;
-          } else {
-            totalMinutes += minutes;
-          }
+          totalMinutes += minutes;
         });
+
+        // Convert excess minutes to hours
+        totalHours += Math.floor(totalMinutes / 60);
+        totalMinutes = totalMinutes % 60;
+
         setTotalHours(totalHours);
         setTotalMinutes(totalMinutes);
       }
@@ -114,13 +120,16 @@ export const DashboardTable: React.FC = () => {
       return strField;
     };
 
-    const csvRows = logsToExport.map(log => [
-      escapeCsvField(log.task_name),
-      escapeCsvField(formatDateTime(log.start_time)),
-      escapeCsvField(formatDateTime(log.end_time)),
-      escapeCsvField(calculateHoursWorked(log.start_time, log.end_time)[0].toFixed(1)),
-      escapeCsvField(log.notes)
-    ].join(','));
+    const csvRows = logsToExport.map(log => {
+      const [hours, minutes] = calculateHoursWorked(log.start_time, log.end_time);
+      return [
+        escapeCsvField(log.task_name),
+        escapeCsvField(formatDateTime(log.start_time)),
+        escapeCsvField(formatDateTime(log.end_time)),
+        escapeCsvField(formatHoursAndMinutes(hours, minutes)),
+        escapeCsvField(log.notes)
+      ].join(',');
+    });
 
     const csvString = [headers.join(','), ...csvRows].join('\n');
 
@@ -136,123 +145,177 @@ export const DashboardTable: React.FC = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     }
-  }, []); // formatDateTime and calculateHoursWorked are stable top-level functions
+  }, []);
 
   return (
       <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
-          className="flex flex-col max-h-[80vh]"
+          className="flex flex-col max-h-[80vh] px-2 sm:px-4"
       >
         <motion.div
-            className="flex justify-between items-center mb-6 sticky top-0 bg-purple-900 z-10 py-4 px-1" // Added bg, z-index, padding
-            initial={{ opacity: 0, y: -20 }} // Adjusted initial animation
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 sticky top-0 bg-purple-900 z-10 py-3 sm:py-4 px-1 gap-3 sm:gap-0"
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay:0.1 }}
         >
           <motion.h1
-              className="text-2xl font-bold text-gray-100 ml-3" // Added ml-3 for padding consistency
+              className="text-xl sm:text-2xl font-bold text-gray-100 ml-1 sm:ml-3"
               initial="hidden"
               animate="visible"
               variants={headerVariants}
-              transition={{ delay: 0.2, duration: 0.4 }} // Adjusted delay
+              transition={{ delay: 0.2, duration: 0.4 }}
           >
             Dashboard
           </motion.h1>
 
-          <div className="flex items-center space-x-3 mr-3"> {/* Wrapper for buttons, adjusted spacing & margin */}
-            <InteractiveHoverButton className={"max-h-fit"}>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto mr-1 sm:mr-3">
+            <InteractiveHoverButton className="max-h-fit w-full sm:w-auto">
               <motion.button
                   onClick={() => handleExportCSV(logs)}
                   disabled={loading || logs.length === 0 || !!error}
-                  className="text-purple-300 hover:text-white text-sm inline-flex items-center px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-purple-300 hover:text-white text-xs sm:text-sm inline-flex items-center justify-center px-2 sm:px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3, duration: 0.3 }} // Adjusted delay
+                  transition={{ delay: 0.3, duration: 0.3 }}
               >
-                <Download size={16} className="mr-2" />
-                Export to CSV
+                <Download size={14} className="mr-1 sm:mr-2" />
+                <span className="hidden xs:inline">Export to </span>CSV
               </motion.button>
             </InteractiveHoverButton>
 
-            <InteractiveHoverButton className={"max-h-fit"}>
+            <InteractiveHoverButton className="max-h-fit w-full sm:w-auto">
               <motion.a
                   href="/"
-                  className="text-purple-300 hover:text-white text-sm inline-flex items-center px-3 py-2 rounded-md" // Added padding & rounded for consistency
-                  // Added motion for consistency if desired
+                  className="text-purple-300 hover:text-white text-xs sm:text-sm inline-flex items-center justify-center px-2 sm:px-3 py-2 rounded-md w-full sm:w-auto"
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.35, duration: 0.3 }} // Staggered delay
+                  transition={{ delay: 0.35, duration: 0.3 }}
               >
-                {/* <motion.span> is fine if InteractiveHoverButton is designed for it */}
-                Go Back to Logger
+                <span className="hidden xs:inline">Go Back to </span>Logger
               </motion.a>
             </InteractiveHoverButton>
           </div>
         </motion.div>
 
         {error && (
-            <motion.p className="text-red-400 text-center mb-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <motion.p className="text-red-400 text-center mb-4 text-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               Error: {error}
             </motion.p>
         )}
-        <div className="overflow-auto px-1"> {/* Added px-1 to prevent scrollbar overlap with rounded corners potentially */}
+
+        <div className="overflow-auto px-1">
           <AnimatePresence>
             {loading ? (
                 <motion.div key="loading" initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}}
                             className="text-center py-8 text-purple-200">
-                  <motion.span className="loading loading-spinner loading-xl"></motion.span>
+                  <motion.span className="loading loading-spinner loading-lg sm:loading-xl"></motion.span>
                 </motion.div>
             ) : (
-                <motion.table
-                    className="min-w-full table-auto border-separate border-spacing-y-2"
-                    variants={tableVariants}
-                    initial="hidden"
-                    animate="visible"
-                >
-                  <thead className="sticky top-0 bg-purple-900">
-                  <motion.tr>
-                    <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>Task</motion.th>
-                    <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>Start</motion.th>
-                    <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>End</motion.th>
-                    <motion.th className="px-4 py-2 text-center text-purple-200" variants={headerVariants}>Hours</motion.th>
-                    <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>Notes</motion.th>
-                  </motion.tr>
-                  </thead>
-                  <tbody>
-                  <AnimatePresence>
-                    {logs.map((log) => (
-                        <motion.tr
-                            key={log.id}
-                            variants={rowVariants}
-                            // initial="hidden" // Already handled by tableVariants staggerChildren
-                            // animate="visible"
-                            exit={{ opacity: 0, y: 20 }}
-                            className="bg-purple-800/80 hover:bg-purple-700/90 transition-colors rounded-lg shadow-md"
-                        >
-                          <td className="px-4 py-2 rounded-l-lg font-semibold">{log.task_name}</td>
-                          <td className="px-4 py-2">{formatDateTime(log.start_time)}</td>
-                          <td className="px-4 py-2">{formatDateTime(log.end_time)}</td>
-                          <td className="px-4 py-2 text-center font-mono bg-purple-700/40 rounded">
-                            <motion.span
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: 0.3, duration: 0.2 }}
+                <>
+                  {/* Desktop Table */}
+                  <motion.table
+                      className="min-w-full table-auto border-separate border-spacing-y-2 hidden md:table"
+                      variants={tableVariants}
+                      initial="hidden"
+                      animate="visible"
+                  >
+                    <thead className="sticky top-0 bg-purple-900">
+                    <motion.tr>
+                      <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>Task</motion.th>
+                      <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>Start</motion.th>
+                      <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>End</motion.th>
+                      <motion.th className="px-4 py-2 text-center text-purple-200" variants={headerVariants}>Duration</motion.th>
+                      <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>Notes</motion.th>
+                    </motion.tr>
+                    </thead>
+                    <tbody>
+                    <AnimatePresence>
+                      {logs.map((log) => {
+                        const [hours, minutes] = calculateHoursWorked(log.start_time, log.end_time);
+                        return (
+                            <motion.tr
+                                key={log.id}
+                                variants={rowVariants}
+                                exit={{ opacity: 0, y: 20 }}
+                                className="bg-purple-800/80 hover:bg-purple-700/90 transition-colors rounded-lg shadow-md"
                             >
-                              {formatHours(calculateHoursWorked(log.start_time, log.end_time)[0])}
-                            </motion.span>
-                          </td>
-                          <td className="px-4 py-2 rounded-r-lg max-w-xs break-words">{log.notes}</td>
-                        </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                  </tbody>
-                </motion.table>
+                              <td className="px-4 py-2 rounded-l-lg font-semibold">{log.task_name}</td>
+                              <td className="px-4 py-2">{formatDateTime(log.start_time)}</td>
+                              <td className="px-4 py-2">{formatDateTime(log.end_time)}</td>
+                              <td className="px-4 py-2 text-center font-mono bg-purple-700/40 rounded">
+                                <motion.span
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.3, duration: 0.2 }}
+                                >
+                                  {formatHoursAndMinutes(hours, minutes)}
+                                </motion.span>
+                              </td>
+                              <td className="px-4 py-2 rounded-r-lg max-w-xs break-words">{log.notes}</td>
+                            </motion.tr>
+                        );
+                      })}
+                    </AnimatePresence>
+                    </tbody>
+                  </motion.table>
+
+                  {/* Mobile Cards */}
+                  <motion.div
+                      className="md:hidden space-y-3"
+                      variants={tableVariants}
+                      initial="hidden"
+                      animate="visible"
+                  >
+                    <AnimatePresence>
+                      {logs.map((log) => {
+                        const [hours, minutes] = calculateHoursWorked(log.start_time, log.end_time);
+                        return (
+                            <motion.div
+                                key={log.id}
+                                variants={rowVariants}
+                                exit={{ opacity: 0, y: 20 }}
+                                className="bg-purple-800/80 rounded-lg shadow-md p-4 space-y-3"
+                            >
+                              <div className="flex justify-between items-start">
+                                <h3 className="font-semibold text-purple-100 flex-1 mr-2">{log.task_name}</h3>
+                                <motion.div
+                                    className="text-sm font-mono bg-purple-700/40 px-2 py-1 rounded text-center min-w-fit"
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.3, duration: 0.2 }}
+                                >
+                                  {formatHoursAndMinutes(hours, minutes)}
+                                </motion.div>
+                              </div>
+
+                              <div className="space-y-2 text-sm text-purple-200">
+                                <div>
+                                  <span className="text-purple-300 font-medium">Start: </span>
+                                  {formatDateTime(log.start_time)}
+                                </div>
+                                <div>
+                                  <span className="text-purple-300 font-medium">End: </span>
+                                  {formatDateTime(log.end_time)}
+                                </div>
+                                {log.notes && (
+                                    <div>
+                                      <span className="text-purple-300 font-medium">Notes: </span>
+                                      <span className="break-words">{log.notes}</span>
+                                    </div>
+                                )}
+                              </div>
+                            </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </motion.div>
+                </>
             )}
           </AnimatePresence>
           {!loading && logs.length === 0 && !error && (
-              <motion.p className="text-center text-purple-200 mt-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <motion.p className="text-center text-purple-200 mt-8 text-sm sm:text-base" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 No time logs found.
               </motion.p>
           )}
@@ -260,14 +323,14 @@ export const DashboardTable: React.FC = () => {
 
         {!loading && logs.length > 0 && (
             <motion.div
-                className="mt-8 p-4 bg-purple-800/90 rounded-xl shadow-lg mx-1" // Added mx-1 for consistency if px-1 on scroll area
+                className="mt-6 sm:mt-8 p-3 sm:p-4 bg-purple-800/90 rounded-xl shadow-lg mx-1"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.4 }}
             >
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
                 <motion.h2
-                    className="text-xl font-bold text-purple-200"
+                    className="text-lg sm:text-xl font-bold text-purple-200"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.6, duration: 0.3 }}
@@ -275,14 +338,14 @@ export const DashboardTable: React.FC = () => {
                   Summary
                 </motion.h2>
                 <motion.div
-                    className="flex items-center gap-3"
+                    className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.7, duration: 0.3 }}
                 >
-                  <span className="text-sm text-purple-300">Total Time:</span>
+                  <span className="text-xs sm:text-sm text-purple-300">Total Time:</span>
                   <motion.div
-                      className="text-2xl font-bold font-mono bg-purple-700/60 px-4 py-2 rounded-lg text-white"
+                      className="text-lg sm:text-2xl font-bold font-mono bg-purple-700/60 px-3 sm:px-4 py-2 rounded-lg text-white w-full sm:w-auto text-center"
                       initial={{ scale: 0.8 }}
                       animate={{
                         scale: 1,
@@ -294,7 +357,7 @@ export const DashboardTable: React.FC = () => {
                         }
                       }}
                   >
-                    {formatHours(totalHours)} Hours and {formatHours(totalMinutes)} minutes
+                    {formatHoursAndMinutes(totalHours, totalMinutes)}
                   </motion.div>
                 </motion.div>
               </div>

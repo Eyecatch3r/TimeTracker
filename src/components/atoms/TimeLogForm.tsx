@@ -225,8 +225,8 @@ export default function TimeLogForm() {
             <motion.input
                 id="taskName" // Make sure this ID matches the label's htmlFor
                 type="text"
-                // value={taskName} // From your TimeLogForm state
-                // onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskName(e.target.value)} // From your TimeLogForm state
+                value={taskName} // From your TimeLogForm state
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskName(e.target.value)} // From your TimeLogForm state
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
                 whileFocus={{scale: 1.02}}
