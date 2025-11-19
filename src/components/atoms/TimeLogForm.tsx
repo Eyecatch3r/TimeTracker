@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabaseClient.ts';
+import { supabase } from '@/lib/supabaseClient.ts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button.tsx";
 import { toast } from "sonner";
