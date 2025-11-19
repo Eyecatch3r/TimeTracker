@@ -1,368 +1,324 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient.ts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button.tsx";
-import { Download } from 'lucide-react'; // Import an icon for the button
+import { Download, Trash2, Pencil, Save, X, Clock, Calendar, ArrowLeft } from 'lucide-react';
 
 interface TimeLog {
-  id: number;
-  task_name: string;
-  start_time: string;
-  end_time: string;
-  notes: string;
+    id: number;
+    task_name: string;
+    start_time: string;
+    end_time: string;
+    notes: string;
 }
 
-const tableVariants = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.07, delayChildren: 0.2 } },
-};
+// --- Helpers ---
+function formatDateTime(dt: string, mobile = false) {
+    if (!dt) return '';
+    const opts: Intl.DateTimeFormatOptions = mobile
+        ? { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+        : { month: 'numeric', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return new Date(dt).toLocaleString(undefined, opts);
+}
 
-const rowVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 },
-};
-
-const headerVariants = {
-  hidden: { opacity: 0, y: -10 },
-  visible: { opacity: 1, y: 0 },
-};
-
-function formatDateTime(dt: string) {
-  if (!dt) return '';
-  const d = new Date(dt);
-  return d.toUTCString();
+function toInputFormat(isoString: string) {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+    return date.toISOString().slice(0, 16);
 }
 
 function calculateHoursWorked(startTime: string, endTime: string): number[] {
-  if (!startTime || !endTime) return [0,0];
-
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return [0,0];
-
-  const diffMs = end.getTime() - start.getTime();
-
-  if (diffMs < 0) return [0,0];
-
-  const minutes = Math.floor((diffMs / 1000 / 60) % 60);
-  const hours = Math.floor(diffMs / 1000 / 60 / 60);
-
-  return [hours, minutes];
+    if (!startTime || !endTime) return [0, 0];
+    const diffMs = new Date(endTime).getTime() - new Date(startTime).getTime();
+    return diffMs < 0 ? [0, 0] : [Math.floor(diffMs / 3600000), Math.floor((diffMs / 60000) % 60)];
 }
 
-function formatHoursAndMinutes(hours: number, minutes: number): string {
-  if (hours === 0 && minutes === 0) return '0h 0m';
-  if (hours === 0) return `${minutes}m`;
-  if (minutes === 0) return `${hours}h`;
-  return `${hours}h ${minutes}m`;
+function formatDuration(h: number, m: number) {
+    if (h === 0 && m === 0) return '0m';
+    return `${h > 0 ? h + 'h ' : ''}${m}m`;
 }
 
-function formatHours(hours: number): string {
-  return hours.toFixed();
-}
-
+// --- Component ---
 export const DashboardTable: React.FC = () => {
-  const [logs, setLogs] = useState<TimeLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [totalHours, setTotalHours] = useState(0);
-  const [totalMinutes, setTotalMinutes] = useState(0);
+    const [logs, setLogs] = useState<TimeLog[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editForm, setEditForm] = useState<Partial<TimeLog>>({});
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setError('');
-      const { data, error: fetchError } = await supabase
-          .from('time_logs')
-          .select('*')
-          .order('start_time', { ascending: false });
+    useEffect(() => { fetchLogs(); }, []);
 
-      if (fetchError) {
-        setError(fetchError.message);
-      } else {
-        setLogs(data || []);
-        let totalHours = 0;
-        let totalMinutes = 0;
-        (data || []).forEach(log => {
-          let [hours, minutes] = calculateHoursWorked(log.start_time, log.end_time);
-          totalHours += hours;
-          totalMinutes += minutes;
-        });
-
-        // Convert excess minutes to hours
-        totalHours += Math.floor(totalMinutes / 60);
-        totalMinutes = totalMinutes % 60;
-
-        setTotalHours(totalHours);
-        setTotalMinutes(totalMinutes);
-      }
-      setLoading(false);
-    })();
-  }, []);
-
-  const handleExportCSV = useCallback((logsToExport: TimeLog[]) => {
-    if (logsToExport.length === 0) {
-      alert("No data to export.");
-      return;
-    }
-
-    const headers = ["Task", "Start Time", "End Time", "Hours Worked", "Notes"];
-
-    const escapeCsvField = (field: any): string => {
-      if (field === null || field === undefined) {
-        return '';
-      }
-      const strField = String(field);
-      if (strField.includes(',') || strField.includes('"') || strField.includes('\n') || strField.includes('\r')) {
-        return `"${strField.replace(/"/g, '""')}"`;
-      }
-      return strField;
+    const fetchLogs = async () => {
+        setLoading(true);
+        const { data, error } = await supabase.from('time_logs').select('*').order('start_time', { ascending: false });
+        if (error) setError(error.message); else setLogs(data || []);
+        setLoading(false);
     };
 
-    const csvRows = logsToExport.map(log => {
-      const [hours, minutes] = calculateHoursWorked(log.start_time, log.end_time);
-      return [
-        escapeCsvField(log.task_name),
-        escapeCsvField(formatDateTime(log.start_time)),
-        escapeCsvField(formatDateTime(log.end_time)),
-        escapeCsvField(formatHoursAndMinutes(hours, minutes)),
-        escapeCsvField(log.notes)
-      ].join(',');
-    });
+    // --- CSV Export Logic ---
+    const handleExportCSV = useCallback(() => {
+        if (logs.length === 0) return;
+        const headers = ["Task", "Start", "End", "Duration", "Notes"];
+        const csvRows = logs.map(log => {
+            const [h, m] = calculateHoursWorked(log.start_time, log.end_time);
+            const escape = (txt: string) => `"${String(txt || '').replace(/"/g, '""')}"`;
+            return [
+                escape(log.task_name),
+                escape(formatDateTime(log.start_time)),
+                escape(formatDateTime(log.end_time)),
+                escape(formatDuration(h, m)),
+                escape(log.notes)
+            ].join(',');
+        });
+        const csvString = [headers.join(','), ...csvRows].join('\n');
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'time_logs.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }, [logs]);
 
-    const csvString = [headers.join(','), ...csvRows].join('\n');
+    const { totalHours, totalMinutes } = useMemo(() => {
+        let tMin = 0;
+        logs.forEach(l => {
+            const [h, m] = calculateHoursWorked(l.start_time, l.end_time);
+            tMin += (h * 60) + m;
+        });
+        return { totalHours: Math.floor(tMin / 60), totalMinutes: tMin % 60 };
+    }, [logs]);
 
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', 'time_logs.csv');
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
-  }, []);
+    const handleDelete = async (id: number) => {
+        if (!confirm("Delete this log?")) return;
+        const prev = [...logs];
+        setLogs(p => p.filter(l => l.id !== id));
+        const { error } = await supabase.from('time_logs').delete().eq('id', id);
+        if (error) { setError("Failed to delete"); setLogs(prev); }
+    };
 
-  return (
-      <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
-          className="flex flex-col max-h-[80vh] px-2 sm:px-4"
-      >
+    const saveEditing = async (id: number) => {
+        const { error } = await supabase.from('time_logs').update({
+            task_name: editForm.task_name,
+            start_time: new Date(editForm.start_time!).toISOString(),
+            end_time: new Date(editForm.end_time!).toISOString(),
+            notes: editForm.notes
+        }).eq('id', id);
+        if (error) setError(error.message);
+        else {
+            setLogs(p => p.map(l => l.id === id ? { ...l, ...editForm } as TimeLog : l));
+            setEditingId(null);
+        }
+    };
+
+    const inputClass = "bg-slate-950/50 text-white border border-slate-500/30 rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all";
+
+    return (
         <motion.div
-            className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 sticky top-0 bg-purple-900 z-10 py-3 sm:py-4 px-1 gap-3 sm:gap-0"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay:0.1 }}
+            layout
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{
+                opacity: 1,
+                scale: 1,
+                boxShadow: ["0px 0px 0px rgba(59, 130, 246, 0)", "0px 0px 20px rgba(59, 130, 246, 0.4)", "0px 0px 0px rgba(59, 130, 246, 0)"]
+            }}
+            className="flex flex-col w-full h-[100dvh] sm:h-[80vh] sm:max-w-3xl bg-slate-900 sm:shadow-2xl text-white sm:rounded-xl overflow-hidden relative border-none sm:border sm:border-slate-700/50"
+            style={{ maxWidth: editingId && window.innerWidth > 640 ? '1000px' : undefined }}
+            transition={{
+                type: 'spring', stiffness: 300, damping: 30,
+                boxShadow: { duration: 3, repeat: Infinity, ease: "easeInOut" }
+            }}
         >
-          <motion.h1
-              className="text-xl sm:text-2xl font-bold text-gray-100 ml-1 sm:ml-3"
-              initial="hidden"
-              animate="visible"
-              variants={headerVariants}
-              transition={{ delay: 0.2, duration: 0.4 }}
-          >
-            Dashboard
-          </motion.h1>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto mr-1 sm:mr-3">
-            <InteractiveHoverButton className="max-h-fit w-full sm:w-auto">
-              <motion.button
-                  onClick={() => handleExportCSV(logs)}
-                  disabled={loading || logs.length === 0 || !!error}
-                  className="text-purple-300 hover:text-white text-xs sm:text-sm inline-flex items-center justify-center px-2 sm:px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3, duration: 0.3 }}
-              >
-                <Download size={14} className="mr-1 sm:mr-2" />
-                <span className="hidden xs:inline">Export to </span>CSV
-              </motion.button>
-            </InteractiveHoverButton>
+            {/* 1. HEADER - OPTIMIZED FOR MOBILE */}
+            <div className="flex-none flex justify-between items-center p-4 sm:p-6 bg-slate-900 z-20 border-b border-slate-800">
+                <h1 className="text-xl sm:text-2xl font-bold truncate mr-2 text-blue-100">Dashboard</h1>
 
-            <InteractiveHoverButton className="max-h-fit w-full sm:w-auto">
-              <motion.a
-                  href="/"
-                  className="text-purple-300 hover:text-white text-xs sm:text-sm inline-flex items-center justify-center px-2 sm:px-3 py-2 rounded-md w-full sm:w-auto"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.35, duration: 0.3 }}
-              >
-                <span className="hidden xs:inline">Go Back to </span>Logger
-              </motion.a>
-            </InteractiveHoverButton>
-          </div>
+                <div className="flex gap-2 shrink-0">
+                    {/* Export Button: Icon only on mobile, Text on Desktop */}
+                    <InteractiveHoverButton className="w-auto">
+                        <button
+                            onClick={handleExportCSV}
+                            disabled={loading || logs.length === 0}
+                            className="text-blue-200 hover:text-white p-2 sm:px-3 sm:py-2 text-sm flex items-center gap-2 transition-colors disabled:opacity-50"
+                            title="Export to CSV"
+                        >
+                            <Download size={18} />
+                            <span className="hidden sm:inline">CSV</span>
+                        </button>
+                    </InteractiveHoverButton>
+
+                    {/* Back Button: Arrow Icon on mobile, Text on Desktop */}
+                    <InteractiveHoverButton className="w-auto">
+                        <a
+                            href="/"
+                            className="text-blue-200 hover:text-white p-2 sm:px-3 sm:py-2 text-sm flex items-center gap-2 transition-colors"
+                            title="Go Back"
+                        >
+                            <ArrowLeft size={18} className="sm:hidden" /> {/* Mobile Icon */}
+                            <span className="hidden sm:inline">Back</span> {/* Desktop Text */}
+                        </a>
+                    </InteractiveHoverButton>
+                </div>
+            </div>
+
+            {/* 2. CONTENT AREA */}
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-600 scrollbar-track-transparent p-0 sm:p-2">
+                {loading ? (
+                    <div className="flex h-full items-center justify-center"><span className="loading loading-spinner text-blue-300" /></div>
+                ) : (
+                    <>
+                        {/* DESKTOP TABLE */}
+                        <table className="w-full hidden sm:table border-separate border-spacing-y-1">
+                            <thead className="sticky top-0 bg-slate-900 z-10">
+                                <tr className="text-blue-300/80 text-xs font-bold uppercase tracking-wider text-left">
+                                    <th className="px-4 py-2">Task</th>
+                                    <th className="px-4 py-2">Start</th>
+                                    <th className="px-4 py-2">End</th>
+                                    <th className="px-4 py-2 text-center">Dur</th>
+                                    <th className="px-4 py-2">Notes</th>
+                                    <th className="px-4 py-2 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <AnimatePresence mode='popLayout'>
+                                    {logs.map((log, index) => {
+                                        const isEditing = editingId === log.id;
+                                        const [h, m] = calculateHoursWorked(isEditing ? editForm.start_time! : log.start_time, isEditing ? editForm.end_time! : log.end_time);
+
+                                        return (
+                                            <motion.tr
+                                                layout="position"
+                                                key={log.id}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, x: -10 }}
+                                                transition={{ delay: index * 0.05 }}
+                                                className={`group rounded-lg transition-colors ${isEditing ? 'bg-slate-800/50' : 'hover:bg-slate-800/30'}`}
+                                            >
+                                                {isEditing ? (
+                                                    <>
+                                                        <td className="px-2 py-3"><input autoFocus value={editForm.task_name} onChange={e => setEditForm({ ...editForm, task_name: e.target.value })} className={inputClass} /></td>
+                                                        <td className="px-2 py-3"><input type="datetime-local" value={toInputFormat(editForm.start_time!)} onChange={e => setEditForm({ ...editForm, start_time: new Date(e.target.value).toISOString() })} className={inputClass} /></td>
+                                                        <td className="px-2 py-3"><input type="datetime-local" value={toInputFormat(editForm.end_time!)} onChange={e => setEditForm({ ...editForm, end_time: new Date(e.target.value).toISOString() })} className={inputClass} /></td>
+                                                        <td className="px-2 py-3 text-center whitespace-nowrap text-sm font-mono text-blue-200">{formatDuration(h, m)}</td>
+                                                        <td className="px-2 py-3"><input value={editForm.notes || ''} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} className={inputClass} /></td>
+                                                        <td className="px-2 py-3 text-right">
+                                                            <div className="flex justify-end gap-2">
+                                                                <button onClick={() => saveEditing(log.id)} className="p-1.5 bg-green-500/20 text-green-400 rounded hover:bg-green-500/30"><Save size={16} /></button>
+                                                                <button onClick={() => setEditingId(null)} className="p-1.5 bg-gray-500/20 text-gray-400 rounded hover:bg-gray-500/30"><X size={16} /></button>
+                                                            </div>
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="px-4 py-3 font-medium text-blue-100 rounded-l-lg">{log.task_name}</td>
+                                                        <td className="px-4 py-3 text-sm text-blue-300 whitespace-nowrap">{formatDateTime(log.start_time)}</td>
+                                                        <td className="px-4 py-3 text-sm text-blue-300 whitespace-nowrap">{formatDateTime(log.end_time)}</td>
+                                                        <td className="px-4 py-3 text-center"><span className="text-xs font-mono bg-slate-800/60 px-2 py-1 rounded text-blue-200 whitespace-nowrap">{formatDuration(h, m)}</span></td>
+                                                        <td className="px-4 py-3 text-sm text-blue-400 truncate max-w-[150px]">{log.notes}</td>
+                                                        <td className="px-4 py-3 text-right rounded-r-lg">
+                                                            <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => { setEditingId(log.id); setEditForm({ ...log }) }} className="text-blue-400 hover:text-blue-200"><Pencil size={15} /></button>
+                                                                <button onClick={() => handleDelete(log.id)} className="text-red-400 hover:text-red-200"><Trash2 size={15} /></button>
+                                                            </div>
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </motion.tr>
+                                        )
+                                    })}
+                                </AnimatePresence>
+                            </tbody>
+                        </table>
+
+                        {/* MOBILE CARDS */}
+                        <div className="sm:hidden flex flex-col gap-2 p-3 pb-20">
+                            <AnimatePresence mode="popLayout">
+                                {logs.map((log, index) => {
+                                    const isEditing = editingId === log.id;
+                                    const [h, m] = calculateHoursWorked(isEditing ? editForm.start_time! : log.start_time, isEditing ? editForm.end_time! : log.end_time);
+
+                                    return (
+                                        <motion.div
+                                            layout="position"
+                                            key={log.id}
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.9 }}
+                                            transition={{ delay: index * 0.05 }}
+                                            className={`rounded-xl p-4 border ${isEditing ? 'bg-slate-800/80 border-blue-500/50' : 'bg-slate-800/20 border-slate-800/50'}`}
+                                        >
+                                            {isEditing ? (
+                                                <div className="flex flex-col gap-3">
+                                                    <input autoFocus value={editForm.task_name} onChange={e => setEditForm({ ...editForm, task_name: e.target.value })} className={`${inputClass} font-bold text-base`} placeholder="Task Name" />
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[10px] uppercase text-blue-400 font-bold tracking-wider">Start</label>
+                                                            <input type="datetime-local" value={toInputFormat(editForm.start_time!)} onChange={e => setEditForm({ ...editForm, start_time: new Date(e.target.value).toISOString() })} className={inputClass} />
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[10px] uppercase text-blue-400 font-bold tracking-wider">End</label>
+                                                            <input type="datetime-local" value={toInputFormat(editForm.end_time!)} onChange={e => setEditForm({ ...editForm, end_time: new Date(e.target.value).toISOString() })} className={inputClass} />
+                                                        </div>
+                                                    </div>
+                                                    <textarea rows={2} value={editForm.notes || ''} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} className={inputClass} placeholder="Notes..." />
+
+                                                    <div className="flex items-center justify-between pt-2 mt-1 border-t border-slate-700/50">
+                                                        <span className="text-xs font-mono text-blue-300">Dur: {formatDuration(h, m)}</span>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => setEditingId(null)} className="px-4 py-2 rounded-lg bg-gray-700 text-gray-200 text-sm font-medium">Cancel</button>
+                                                            <button onClick={() => saveEditing(log.id)} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium flex items-center gap-1">Save</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <h3 className="font-bold text-lg text-blue-100 leading-tight break-words pr-2">{log.task_name}</h3>
+                                                        <span className="text-xs font-mono bg-slate-700/40 text-blue-200 px-2 py-1 rounded whitespace-nowrap">{formatDuration(h, m)}</span>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-2 text-sm text-blue-300 mb-3">
+                                                        <div className="flex items-center gap-1.5"><Calendar size={13} className="text-blue-500" /> {formatDateTime(log.start_time, true)}</div>
+                                                        <div className="flex items-center gap-1.5 justify-end"><Clock size={13} className="text-blue-500" /> {formatDateTime(log.end_time, true).split(',')[1]}</div>
+                                                    </div>
+
+                                                    {log.notes && (
+                                                        <p className="text-sm text-blue-400/80 italic bg-slate-900/20 p-2 rounded mb-3 break-words">{log.notes}</p>
+                                                    )}
+
+                                                    <div className="flex justify-end gap-3 pt-2 border-t border-slate-800/50">
+                                                        <button onClick={() => { setEditingId(log.id); setEditForm({ ...log }) }} className="flex items-center gap-1.5 text-sm text-blue-300 hover:text-white p-2"><Pencil size={14} /> Edit</button>
+                                                        <button onClick={() => handleDelete(log.id)} className="flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 p-2"><Trash2 size={14} /> Delete</button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </motion.div>
+                                    );
+                                })}
+                            </AnimatePresence>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* 3. FOOTER */}
+            <div className="flex-none p-4 bg-slate-900/95 backdrop-blur border-t border-slate-800 z-20 flex justify-between items-center">
+                <span className="text-blue-300 text-sm font-medium">Summary</span>
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] sm:text-xs text-blue-400 uppercase tracking-wider">Total</span>
+                    <motion.div
+                        key={totalMinutes} initial={{ scale: 0.9 }} animate={{ scale: 1 }}
+                        className="bg-slate-800 text-white font-bold font-mono px-3 py-1.5 rounded-lg border border-slate-700 text-sm sm:text-base"
+                    >
+                        {formatDuration(totalHours, totalMinutes)}
+                    </motion.div>
+                </div>
+            </div>
+
         </motion.div>
-
-        {error && (
-            <motion.p className="text-red-400 text-center mb-4 text-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              Error: {error}
-            </motion.p>
-        )}
-
-        <div className="overflow-auto px-1">
-          <AnimatePresence>
-            {loading ? (
-                <motion.div key="loading" initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}}
-                            className="text-center py-8 text-purple-200">
-                  <motion.span className="loading loading-spinner loading-lg sm:loading-xl"></motion.span>
-                </motion.div>
-            ) : (
-                <>
-                  {/* Desktop Table */}
-                  <motion.table
-                      className="min-w-full table-auto border-separate border-spacing-y-2 hidden md:table"
-                      variants={tableVariants}
-                      initial="hidden"
-                      animate="visible"
-                  >
-                    <thead className="sticky top-0 bg-purple-900">
-                    <motion.tr>
-                      <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>Task</motion.th>
-                      <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>Start</motion.th>
-                      <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>End</motion.th>
-                      <motion.th className="px-4 py-2 text-center text-purple-200" variants={headerVariants}>Duration</motion.th>
-                      <motion.th className="px-4 py-2 text-left text-purple-200" variants={headerVariants}>Notes</motion.th>
-                    </motion.tr>
-                    </thead>
-                    <tbody>
-                    <AnimatePresence>
-                      {logs.map((log) => {
-                        const [hours, minutes] = calculateHoursWorked(log.start_time, log.end_time);
-                        return (
-                            <motion.tr
-                                key={log.id}
-                                variants={rowVariants}
-                                exit={{ opacity: 0, y: 20 }}
-                                className="bg-purple-800/80 hover:bg-purple-700/90 transition-colors rounded-lg shadow-md"
-                            >
-                              <td className="px-4 py-2 rounded-l-lg font-semibold">{log.task_name}</td>
-                              <td className="px-4 py-2">{formatDateTime(log.start_time)}</td>
-                              <td className="px-4 py-2">{formatDateTime(log.end_time)}</td>
-                              <td className="px-4 py-2 text-center font-mono bg-purple-700/40 rounded">
-                                <motion.span
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: 0.3, duration: 0.2 }}
-                                >
-                                  {formatHoursAndMinutes(hours, minutes)}
-                                </motion.span>
-                              </td>
-                              <td className="px-4 py-2 rounded-r-lg max-w-xs break-words">{log.notes}</td>
-                            </motion.tr>
-                        );
-                      })}
-                    </AnimatePresence>
-                    </tbody>
-                  </motion.table>
-
-                  {/* Mobile Cards */}
-                  <motion.div
-                      className="md:hidden space-y-3"
-                      variants={tableVariants}
-                      initial="hidden"
-                      animate="visible"
-                  >
-                    <AnimatePresence>
-                      {logs.map((log) => {
-                        const [hours, minutes] = calculateHoursWorked(log.start_time, log.end_time);
-                        return (
-                            <motion.div
-                                key={log.id}
-                                variants={rowVariants}
-                                exit={{ opacity: 0, y: 20 }}
-                                className="bg-purple-800/80 rounded-lg shadow-md p-4 space-y-3"
-                            >
-                              <div className="flex justify-between items-start">
-                                <h3 className="font-semibold text-purple-100 flex-1 mr-2">{log.task_name}</h3>
-                                <motion.div
-                                    className="text-sm font-mono bg-purple-700/40 px-2 py-1 rounded text-center min-w-fit"
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: 0.3, duration: 0.2 }}
-                                >
-                                  {formatHoursAndMinutes(hours, minutes)}
-                                </motion.div>
-                              </div>
-
-                              <div className="space-y-2 text-sm text-purple-200">
-                                <div>
-                                  <span className="text-purple-300 font-medium">Start: </span>
-                                  {formatDateTime(log.start_time)}
-                                </div>
-                                <div>
-                                  <span className="text-purple-300 font-medium">End: </span>
-                                  {formatDateTime(log.end_time)}
-                                </div>
-                                {log.notes && (
-                                    <div>
-                                      <span className="text-purple-300 font-medium">Notes: </span>
-                                      <span className="break-words">{log.notes}</span>
-                                    </div>
-                                )}
-                              </div>
-                            </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </motion.div>
-                </>
-            )}
-          </AnimatePresence>
-          {!loading && logs.length === 0 && !error && (
-              <motion.p className="text-center text-purple-200 mt-8 text-sm sm:text-base" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                No time logs found.
-              </motion.p>
-          )}
-        </div>
-
-        {!loading && logs.length > 0 && (
-            <motion.div
-                className="mt-6 sm:mt-8 p-3 sm:p-4 bg-purple-800/90 rounded-xl shadow-lg mx-1"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
-            >
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-                <motion.h2
-                    className="text-lg sm:text-xl font-bold text-purple-200"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.6, duration: 0.3 }}
-                >
-                  Summary
-                </motion.h2>
-                <motion.div
-                    className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.7, duration: 0.3 }}
-                >
-                  <span className="text-xs sm:text-sm text-purple-300">Total Time:</span>
-                  <motion.div
-                      className="text-lg sm:text-2xl font-bold font-mono bg-purple-700/60 px-3 sm:px-4 py-2 rounded-lg text-white w-full sm:w-auto text-center"
-                      initial={{ scale: 0.8 }}
-                      animate={{
-                        scale: 1,
-                        transition: {
-                          type: "spring",
-                          stiffness: 200,
-                          damping: 10,
-                          delay: 0.8
-                        }
-                      }}
-                  >
-                    {formatHoursAndMinutes(totalHours, totalMinutes)}
-                  </motion.div>
-                </motion.div>
-              </div>
-            </motion.div>
-        )}
-      </motion.div>
-  );
+    );
 };

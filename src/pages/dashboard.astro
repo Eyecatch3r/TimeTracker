@@ -6,11 +6,10 @@ import { Toaster } from "../components/ui/sonner";
 ---
 <html>
 <Layout>
-  <div class="fixed inset-0 flex items-center justify-center z-10">
-    <div class="w-full max-w-3xl bg-purple-900 shadow-xl text-white rounded-xl p-8">
-      <DashboardTable client:load />
+    <div class="fixed inset-0 flex items-center justify-center z-10 p-4">
+        {/* Removed bg-purple, max-w-3xl, p-8 etc. React handles the card now. */}
+        <DashboardTable client:load />
     </div>
-  </div>
-  <Toaster client:load />
+    <Toaster client:load />
 </Layout>
-</html> 
+</html>
