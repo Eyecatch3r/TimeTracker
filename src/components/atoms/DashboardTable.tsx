@@ -30,7 +30,7 @@ const headerVariants = {
 function formatDateTime(dt: string) {
   if (!dt) return '';
   const d = new Date(dt);
-  return d.toLocaleString();
+  return d.toUTCString();
 }
 
 function calculateHoursWorked(startTime: string, endTime: string): number[] {
