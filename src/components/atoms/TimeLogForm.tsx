@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.ts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button.tsx";
 import { toast } from "sonner";
+import HoverButton from "@/components/atoms/HoverButton.tsx";
+import { TableProperties } from 'lucide-react';
 
 // Define your predefined task names
 const PREDEFINED_TASKS = [
@@ -230,11 +231,12 @@ export default function TimeLogForm() {
                         )}
                     </AnimatePresence>
                 </motion.div>
-                <InteractiveHoverButton className={"max-h-fit"}>
-                    <a href="/dashboard" className="text-blue-200 hover:text-white text-sm inline-flex items-center">
-                        <span>View All Time Logs</span>
-                    </a>
-                </InteractiveHoverButton>
+                <HoverButton
+                    text="View Dashboard"
+                    href="/dashboard"
+                    icon={TableProperties}
+                    className="max-h-fit"
+                />
             </motion.div>
 
             <motion.form

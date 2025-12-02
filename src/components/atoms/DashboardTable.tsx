@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient.ts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button.tsx";
-import { Download, Trash2, Pencil, Save, X, Clock, Calendar, ArrowLeft } from 'lucide-react';
+import HoverButton from "@/components/atoms/HoverButton.tsx";
+import {Download, Trash2, Pencil, Save, X, Clock, Calendar, ArrowLeft, ClipboardClock} from 'lucide-react';
 
 interface TimeLog {
     id: number;
@@ -132,35 +132,27 @@ export const DashboardTable: React.FC = () => {
             }}
         >
 
-            {/* 1. HEADER - OPTIMIZED FOR MOBILE */}
+
             <div className="flex-none flex justify-between items-center p-4 sm:p-6 bg-slate-900 z-20 border-b border-slate-800">
                 <h1 className="text-xl sm:text-2xl font-bold truncate mr-2 text-blue-100">Dashboard</h1>
 
-                <div className="flex gap-2 shrink-0">
-                    {/* Export Button: Icon only on mobile, Text on Desktop */}
-                    <InteractiveHoverButton className="w-auto">
-                        <button
-                            onClick={handleExportCSV}
-                            disabled={loading || logs.length === 0}
-                            className="text-blue-200 hover:text-white p-2 sm:px-3 sm:py-2 text-sm flex items-center gap-2 transition-colors disabled:opacity-50"
-                            title="Export to CSV"
-                        >
-                            <Download size={18} />
-                            <span className="hidden sm:inline">CSV</span>
-                        </button>
-                    </InteractiveHoverButton>
+                <div className="flex gap-3 shrink-0 items-center">
+                    {/* Export Button */}
+                    <HoverButton
+                        text=""
+                        onClick={handleExportCSV}
+                        icon={Download}
+                        disabled={loading || logs.length === 0}
+                        compactOnMobile={true}
+                    />
 
-                    {/* Back Button: Arrow Icon on mobile, Text on Desktop */}
-                    <InteractiveHoverButton className="w-auto">
-                        <a
-                            href="/"
-                            className="text-blue-200 hover:text-white p-2 sm:px-3 sm:py-2 text-sm flex items-center gap-2 transition-colors"
-                            title="Go Back"
-                        >
-                            <ArrowLeft size={18} className="sm:hidden" /> {/* Mobile Icon */}
-                            <span className="hidden sm:inline">Back</span> {/* Desktop Text */}
-                        </a>
-                    </InteractiveHoverButton>
+                    {/* Back Button */}
+                    <HoverButton
+                        text=""
+                        href="/"
+                        icon={ClipboardClock}
+                        compactOnMobile={true}
+                    />
                 </div>
             </div>
 
