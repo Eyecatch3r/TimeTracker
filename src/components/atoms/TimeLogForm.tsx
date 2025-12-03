@@ -232,10 +232,11 @@ export default function TimeLogForm() {
                     </AnimatePresence>
                 </motion.div>
                 <HoverButton
-                    text="View Dashboard"
+                    text=""
                     href="/dashboard"
                     icon={TableProperties}
                     className="max-h-fit"
+                    compactOnMobile={true}
                 />
             </motion.div>
 
