@@ -1,15 +1,14 @@
 ---
 import '../assets/global.css';
-import TimeLogForm from '../components/atoms/TimeLogForm.tsx';
-import Particles from '../components/atoms/Particles.tsx';
 import Layout from "../layouts/Layout.astro";
 import { Toaster } from "../components/ui/sonner";
+import TimeTrackerApp from "../components/apps/TimeTrackerApp";
 ---
 
 <Layout>
 <!-- TimeLogForm positioned independently, centered on screen -->
 <div class="fixed inset-0 flex items-center justify-center z-30">
-  <TimeLogForm client:load />
+  <TimeTrackerApp client:load />
 </div>
 <Toaster client:load />
 </Layout>

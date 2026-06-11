@@ -1,14 +1,14 @@
 ---
 import '../assets/global.css';
 import Layout from "../layouts/Layout.astro";
-import {DashboardTable} from '../components/atoms/DashboardTable.tsx';
 import { Toaster } from "../components/ui/sonner";
+import DashboardApp from "../components/apps/DashboardApp";
 ---
 <html>
 <Layout>
     <div class="fixed inset-0 flex items-center justify-center z-10 p-4">
         {/* Removed bg-purple, max-w-3xl, p-8 etc. React handles the card now. */}
-        <DashboardTable client:load />
+        <DashboardApp client:load />
     </div>
     <Toaster client:load />
 </Layout>

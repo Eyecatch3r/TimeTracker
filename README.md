@@ -62,8 +62,13 @@ This project is configured for easy deployment to Netlify. Follow these steps to
 Set the following environment variables in your Netlify dashboard (Site settings > Environment variables):
 
 - `PUBLIC_SUPABASE_URL` - Your Supabase project URL
-- `PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+- `PUBLIC_SUPABASE_KEY` - Your Supabase anonymous or publishable key
 
 ### Continuous Deployment
 
 Netlify will automatically rebuild and deploy your site whenever you push changes to your repository.
+
+## Security
+
+Authentication and row-level security rollout instructions live in
+[`docs/security.md`](docs/security.md).
