@@ -4,6 +4,8 @@ import type { Session } from '@supabase/supabase-js';
 import { LockKeyhole, LogIn, LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 interface AuthGateProps {
     children: ReactNode;
 }
@@ -14,6 +16,7 @@ export default function AuthGate({ children }: AuthGateProps) {
     const [submitting, setSubmitting] = useState(false);
     const [email, setEmail] = useState('');
     const [linkSent, setLinkSent] = useState(false);
+    const [cooldown, setCooldown] = useState(0);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -40,6 +43,16 @@ export default function AuthGate({ children }: AuthGateProps) {
         };
     }, []);
 
+    useEffect(() => {
+        if (cooldown <= 0) return;
+
+        const timer = window.setInterval(() => {
+            setCooldown((remaining) => Math.max(remaining - 1, 0));
+        }, 1000);
+
+        return () => window.clearInterval(timer);
+    }, [cooldown]);
+
     const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setSubmitting(true);
@@ -48,14 +61,21 @@ export default function AuthGate({ children }: AuthGateProps) {
         const { error: signInError } = await supabase.auth.signInWithOtp({
             email: email.trim(),
             options: {
+                emailRedirectTo: window.location.origin,
                 shouldCreateUser: false,
             },
         });
 
         if (signInError) {
-            setError(signInError.message);
+            const rateLimited = signInError.message.toLowerCase().includes('rate limit');
+            setError(
+                rateLimited
+                    ? 'Supabase allows only two emails per hour on its built-in mail service. Try again after the hourly limit resets.'
+                    : signInError.message,
+            );
         } else {
             setLinkSent(true);
+            setCooldown(RESEND_COOLDOWN_SECONDS);
         }
 
         setSubmitting(false);
@@ -119,17 +139,23 @@ export default function AuthGate({ children }: AuthGateProps) {
 
                     {linkSent && (
                         <p className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-300" role="status">
-                            Sign-in link sent. Check your email.
+                            Sign-in link sent. Check your email, including spam.
                         </p>
                     )}
 
                     <button
                         type="submit"
-                        disabled={submitting || linkSent}
+                        disabled={submitting || cooldown > 0}
                         className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <LogIn size={18} aria-hidden="true" />
-                        {submitting ? 'Sending...' : linkSent ? 'Link sent' : 'Email sign-in link'}
+                        {submitting
+                            ? 'Sending...'
+                            : cooldown > 0
+                                ? `Resend in ${cooldown}s`
+                                : linkSent
+                                    ? 'Resend sign-in link'
+                                    : 'Email sign-in link'}
                     </button>
                 </form>
             </div>

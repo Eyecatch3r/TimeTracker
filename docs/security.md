@@ -32,6 +32,8 @@ security independently blocks anonymous access.
 
 The login form calls `signInWithOtp` with `shouldCreateUser: false`. It can send
 links only to the existing owner; it cannot create another Auth user.
+`emailRedirectTo` uses the current origin. Supabase Auth must allow both the
+hosted origin and `http://localhost:4321/**`.
 
 ## Tradeoff
 
